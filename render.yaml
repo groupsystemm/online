@@ -1,0 +1,31 @@
+<<<<<<< HEAD
+services:
+  - type: web
+    name: flask-grade-system
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    pythonVersion: 3.10.13
+    autoDeploy: true
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        value: my-secret-key
+=======
+services:
+  - type: web
+    name: flask-grade-system
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    pythonVersion: 3.10.13
+    autoDeploy: true
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        value: my-secret-key
+>>>>>>> 2b9a045 (Initial commit with requirements)
