@@ -1,95 +1,88 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Teacher Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "layout.html" %}
 
-  <!-- Optional: Use Bootstrap for future improvements -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+{% block title %}Teacher Dashboard{% endblock %}
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f7fc;
-      margin: 0;
-      padding: 20px;
-      color: #333;
-    }
+{% block content %}
+<style>
+  .dashboard-container {
+    max-width: 700px;
+  }
 
-    .dashboard-container {
-      max-width: 700px;
-      margin: 40px auto;
-      background: white;
-      padding: 30px 40px;
-      border-radius: 8px;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.1);
-      text-align: center;
-    }
+  .btn-dashboard {
+    background-color: #2980b9;
+    padding: 14px 24px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 16px;
+    min-width: 140px;
+    box-shadow: 0 3px 6px rgba(41, 128, 185, 0.4);
+    color: white !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    text-decoration: none;
+  }
 
-    .dashboard-container img {
-      max-width: 150px;
-      margin-bottom: 20px;
-      border-radius: 20%;
-    }
+  .btn-dashboard:hover {
+    background-color: #1f6695;
+    box-shadow: 0 5px 10px rgba(31, 102, 149, 0.6);
+    text-decoration: none;
+    color: white !important;
+  }
 
-    h2 {
-      margin-bottom: 10px;
-      font-size: 28px;
-      color: #2c3e50;
-    }
+  .btn-dashboard.logout {
+    background-color: #c0392b;
+    box-shadow: 0 3px 6px rgba(192, 57, 43, 0.4);
+  }
 
-    .welcome-message {
-      font-size: 18px;
-      margin-bottom: 30px;
-      color: #555;
-    }
+  .btn-dashboard.logout:hover {
+    background-color: #992d22;
+    box-shadow: 0 5px 10px rgba(153, 45, 34, 0.6);
+  }
 
-    .dashboard-actions {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
+  img.logo {
+    max-width: 150px;
+    margin-bottom: 20px;
+    border-radius: 20%;
+  }
 
-    .btn-dashboard {
-      background-color: #2980b9;
-      color: white;
-      padding: 14px 24px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: bold;
-      font-size: 16px;
-      box-shadow: 0 3px 6px rgba(41, 128, 185, 0.4);
-      transition: background-color 0.3s ease;
-      min-width: 140px;
-    }
+  h2 {
+    font-size: 28px;
+    color: #2c3e50;
+  }
 
-    .btn-dashboard:hover {
-      background-color: #1c5980;
-    }
+  .welcome-message {
+    font-size: 18px;
+    color: #7f8c8d; /* text-secondary */
+  }
 
-    .btn-dashboard.logout {
-      background-color: #c0392b;
-    }
+  .dashboard-actions {
+    gap: 1rem;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+</style>
 
-    .btn-dashboard.logout:hover {
-      background-color: #822b22;
-    }
-  </style>
-</head>
-<body>
-  <div class="dashboard-container">
-    <img src="{{ url_for('static', filename='images/gage.png') }}" alt="Gage University College Logo" />
+<div class="dashboard-container bg-white shadow p-4 rounded mx-auto text-center">
 
-    <h2>👋 Welcome, {{ name }} (Teacher)</h2>
-    <p class="welcome-message">Welcome to Gage University College Teacher Dashboard</p>
+  <!-- Gage University College Logo -->
+  <img src="{{ url_for('static', filename='images/gage.png') }}" alt="Gage University College Logo" class="logo" />
 
-    <div class="dashboard-actions">
-      <a href="/add-course" class="btn-dashboard">➕ Add Course</a>
-      <a href="/add-grade" class="btn-dashboard">📝 Add Grade</a>
-      <a href="/logout" class="btn-dashboard logout">🔓 Logout</a>
-    </div>
+  <!-- Welcome Text -->
+  <h2 class="mb-2">
+    👋 Welcome, {{ name }} <small class="text-muted">(Teacher)</small>
+  </h2>
+  <p class="welcome-message mb-4">
+    Welcome to Gage University College Teacher Dashboard
+  </p>
+
+  <!-- Dashboard Buttons -->
+  <div class="dashboard-actions">
+    <a href="/add-course" class="btn-dashboard">➕ Add Course</a>
+    <a href="/add-grade" class="btn-dashboard">📝 Add Grade</a>
+    <a href="/logout" class="btn-dashboard logout">🔓 Logout</a>
   </div>
-</body>
-</html>
+</div>
+{% endblock %}
