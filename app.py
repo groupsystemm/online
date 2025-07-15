@@ -11,6 +11,9 @@ app.secret_key = "my-dev-secret-key"
 
 def create_default_admin():
     conn = create_connection()
+    if conn is None:
+        print("❌ DB connection failed while creating default admin.")
+        return
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM users WHERE email = %s", ('admin@site.com',))
     if not cursor.fetchone():
@@ -32,6 +35,8 @@ def login():
         email = request.form['email'].strip().lower()
         password = request.form['password']
         conn = create_connection()
+        if conn is None:
+            return "❌ Database connection failed."
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
         user = cursor.fetchone()
@@ -51,6 +56,8 @@ def register():
         name, email, password, role = (request.form[k] for k in ('name', 'email', 'password', 'role'))
         email = email.strip().lower()
         conn = create_connection()
+        if conn is None:
+            return "❌ Database connection failed."
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
         if cursor.fetchone():
@@ -60,9 +67,9 @@ def register():
             cursor.execute("INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
                            (name, email, hashed_password, role))
             if role == 'student':
-                cursor.execute("INSERT IGNORE INTO students (name, email) VALUES (%s, %s)", (name, email))
+                cursor.execute("INSERT INTO students (name, email) VALUES (%s, %s)", (name, email))
             conn.commit()
-            message = "\u2705 Registration successful! You can now log in."
+            message = "✅ Registration successful! You can now log in."
         cursor.close()
         conn.close()
     return render_template("register.html", message=message, error=error)
@@ -85,6 +92,8 @@ def add_course():
     if session.get('role') != 'teacher':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     message = error = None
     if request.method == 'POST':
@@ -94,9 +103,9 @@ def add_course():
             cursor.execute("INSERT INTO courses (course_name, teacher_id, department) VALUES (%s, %s, %s)",
                            (course_name, session['user_id'], department))
             conn.commit()
-            message = "\u2705 Course added successfully!"
+            message = "✅ Course added successfully!"
         except Exception as e:
-            error = f"\u274C Error: {str(e)}"
+            error = f"❌ Error: {str(e)}"
     cursor.close()
     conn.close()
     return render_template('add_course.html', message=message, error=error)
@@ -106,6 +115,8 @@ def manage_courses():
     if session.get('role') != 'admin':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT c.id, c.course_name, c.department, u.name AS teacher_name FROM courses c JOIN users u ON c.teacher_id = u.id")
     courses = cursor.fetchall()
@@ -118,6 +129,8 @@ def add_grade():
     if session.get('role') != 'teacher':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT id, name FROM students")
     students = cursor.fetchall()
@@ -138,9 +151,9 @@ def add_grade():
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (student_id, course_id, mid, final, assignment, quiz, total))
             conn.commit()
-            message = f"\u2705 Grade submitted successfully! Total: {total}"
+            message = f"✅ Grade submitted! Total: {total}"
         except Exception as e:
-            error = f"\u274C Error: {str(e)}"
+            error = f"❌ Error: {str(e)}"
     cursor.close()
     conn.close()
     return render_template('add_grade.html', students=students, courses=courses, message=message, error=error)
@@ -150,13 +163,15 @@ def view_grades():
     if session.get('role') != 'student':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
     student = cursor.fetchone()
     if not student:
         cursor.close()
         conn.close()
-        return "Student not found."
+        return "❌ Student not found."
     cursor.execute("""
         SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
         FROM grades g 
@@ -202,6 +217,8 @@ def view_all_grades():
     if session.get('role') != 'admin':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT s.name AS student_name, s.email, c.course_name,
@@ -241,9 +258,13 @@ def download_grades():
     if session.get('role') != 'student':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
     student = cursor.fetchone()
+    if not student:
+        return "❌ Student not found."
     cursor.execute("""
         SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
         FROM grades g
@@ -266,6 +287,8 @@ def admin_students():
     if session.get('role') != 'admin':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM students")
     students = cursor.fetchall()
@@ -278,6 +301,8 @@ def admin_teachers():
     if session.get('role') != 'admin':
         return redirect('/login')
     conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM users WHERE role = 'teacher'")
     teachers = cursor.fetchall()
