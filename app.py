@@ -162,55 +162,71 @@ def add_grade():
 def view_grades():
     if session.get('role') != 'student':
         return redirect('/login')
+
     conn = create_connection()
     if conn is None:
         return "❌ Database connection failed."
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
-    student = cursor.fetchone()
-    if not student:
-        cursor.close()
-        conn.close()
-        return "❌ Student not found."
-    cursor.execute("""
-        SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
-        FROM grades g 
-        JOIN courses c ON g.course_id = c.id 
-        WHERE g.student_id = %s
-    """, (student['id'],))
-    grades = cursor.fetchall()
 
-    def grade_to_letter(g):
-        if g is None:
-            return "-"
-        g = float(g)
-        if g >= 90: return "A+"
-        elif g >= 80: return "A"
-        elif g >= 70: return "B+"
-        elif g >= 60: return "B"
-        elif g >= 50: return "C"
-        else: return "F"
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
+        student = cursor.fetchone()
+        if not student:
+            return "❌ Student not found."
 
-    cleaned_grades = []
-    for g in grades:
-        mid = g.get('mid_exam') or 0
-        final = g.get('final_exam') or 0
-        assignment = g.get('assignment') or 0
-        quiz = g.get('quiz') or 0
-        total = mid + final + assignment + quiz
-        cleaned_grades.append({
-            'course_name': g['course_name'],
-            'mid_exam': mid,
-            'final_exam': final,
-            'assignment': assignment,
-            'quiz': quiz,
-            'total_grade': total,
-            'letter': grade_to_letter(total)
-        })
-    average = round(sum(g['total_grade'] for g in cleaned_grades) / len(cleaned_grades), 2) if cleaned_grades else None
-    cursor.close()
-    conn.close()
-    return render_template('view_grades.html', grades=cleaned_grades, name=session['name'], average=average)
+        cursor.execute("""
+            SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+            FROM grades g 
+            JOIN courses c ON g.course_id = c.id 
+            WHERE g.student_id = %s
+        """, (student['id'],))
+        grades = cursor.fetchall()
+
+        def grade_to_letter(g):
+            if g is None:
+                return "-"
+            g = float(g)
+            if g >= 90: return "A+"
+            elif g >= 80: return "A"
+            elif g >= 70: return "B+"
+            elif g >= 60: return "B"
+            elif g >= 50: return "C"
+            else: return "F"
+
+        cleaned_grades = []
+        for g in grades:
+            mid = g.get('mid_exam') or 0
+            final = g.get('final_exam') or 0
+            assignment = g.get('assignment') or 0
+            quiz = g.get('quiz') or 0
+            total = mid + final + assignment + quiz
+            cleaned_grades.append({
+                'course_name': g.get('course_name', 'N/A'),
+                'mid_exam': mid,
+                'final_exam': final,
+                'assignment': assignment,
+                'quiz': quiz,
+                'total_grade': total,
+                'letter': grade_to_letter(total)
+            })
+
+        average = round(sum(g['total_grade'] for g in cleaned_grades) / len(cleaned_grades), 2) if cleaned_grades else None
+
+        return render_template(
+            'view_grades.html',
+            grades=cleaned_grades,
+            name=session.get('name', 'Student'),
+            average=average
+        )
+
+    except Exception as e:
+        return f"❌ Internal error in view-grades: {type(e).__name__} - {e}"
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
 
 @app.route('/admin/view-all-grades')
 def view_all_grades():
