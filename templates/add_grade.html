@@ -1,134 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>📊 Add Grade</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <style>
-    .form-label {
-      font-weight: 500;
-    }
-    .grade-box {
-      font-weight: bold;
-      font-size: 1.2rem;
-    }
-  </style>
-</head>
-<body class="bg-light">
+{% extends "layout.html" %}
+{% block title %}Add Grade{% endblock %}
+{% block content %}
+<div class="card shadow-sm p-4">
+  <h2 class="text-center text-primary mb-4">📊 Add Grade</h2>
 
-<div class="container mt-5">
-  <div class="card shadow-lg p-4">
-    <h2 class="text-center text-primary mb-4">📊 Add Grade</h2>
+  {% if message %}
+    <div class="alert alert-success text-center">{{ message }}</div>
+  {% elif error %}
+    <div class="alert alert-danger text-center">{{ error }}</div>
+  {% endif %}
 
-    {% if message %}
-      <div class="alert alert-success text-center">{{ message }}</div>
-    {% elif error %}
-      <div class="alert alert-danger text-center">{{ error }}</div>
-    {% endif %}
-
-    <form method="POST">
-      <div class="row mb-3">
-        <div class="col-md-6">
-          <label for="student_id" class="form-label">👩‍🎓 Select Student:</label>
-          <select class="form-select" name="student_id" id="student_id" required>
-            <option disabled selected>Select a student</option>
-            {% for student in students %}
-              <option value="{{ student.id }}">{{ student.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label for="course_id" class="form-label">📚 Select Course:</label>
-          <select class="form-select" name="course_id" id="course_id" required>
-            <option disabled selected>Select a course</option>
-            {% for course in courses %}
-              <option value="{{ course.id }}">{{ course.course_name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label for="semester" class="form-label">🕓 Select Semester:</label>
-        <select class="form-select" name="semester" id="semester" required>
-          <option disabled selected>Select semester</option>
-          <option value="1">1st Semester</option>
-          <option value="2">2nd Semester</option>
-          <option value="3">3rd Semester</option>
+  <form method="POST" novalidate>
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="studentSelect" class="form-label">👩‍🎓 Select Student:</label>
+        <select id="studentSelect" class="form-select" name="student_id" required>
+          <option disabled selected>Select a student</option>
+          {% for student in students %}
+            <option value="{{ student.id }}">{{ student.name }}</option>
+          {% endfor %}
         </select>
       </div>
-
-      <div class="row mb-3">
-        <div class="col-md-3">
-          <label for="mid" class="form-label">🧮 Mid Exam (30%)</label>
-          <input type="number" class="form-control" name="mid_exam" id="mid" min="0" max="100" required />
-        </div>
-        <div class="col-md-3">
-          <label for="final" class="form-label">📚 Final Exam (40%)</label>
-          <input type="number" class="form-control" name="final_exam" id="final" min="0" max="100" required />
-        </div>
-        <div class="col-md-3">
-          <label for="assignment" class="form-label">✍️ Assignment (20%)</label>
-          <input type="number" class="form-control" name="assignment" id="assignment" min="0" max="100" required />
-        </div>
-        <div class="col-md-3">
-          <label for="quiz" class="form-label">📝 Quiz (10%)</label>
-          <input type="number" class="form-control" name="quiz" id="quiz" min="0" max="100" required />
-        </div>
+      <div class="col-md-6">
+        <label for="courseSelect" class="form-label">📚 Select Course:</label>
+        <select id="courseSelect" class="form-select" name="course_id" required>
+          <option disabled selected>Select a course</option>
+          {% for course in courses %}
+            <option value="{{ course.id }}">{{ course.course_name }}</option>
+          {% endfor %}
+        </select>
       </div>
+    </div>
 
-      <div class="text-center mt-3 mb-4">
-        <span class="badge bg-info grade-box">Total Grade: <span id="total">-</span></span>
-        <span class="badge bg-secondary grade-box ms-3">Letter Grade: <span id="letter">-</span></span>
-      </div>
+    <div class="mb-3">
+      <label for="semesterSelect" class="form-label">🕓 Semester</label>
+      <select id="semesterSelect" class="form-select" name="semester" required>
+        <option disabled selected>Select semester</option>
+        <option value="1">1st Semester</option>
+        <option value="2">2nd Semester</option>
+        <option value="3">3rd Semester</option>
+      </select>
+    </div>
 
-      <div class="text-center">
-        <button type="submit" class="btn btn-success px-4">✅ Submit Grade</button>
-        <a href="/dashboard" class="btn btn-outline-secondary ms-3">⬅️ Back</a>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <label for="mid" class="form-label">🧮 Mid Exam (30%)</label>
+        <input type="number" id="mid" class="form-control" name="mid_exam" min="0" max="100" step="0.01" required>
       </div>
-    </form>
-  </div>
+      <div class="col-md-3">
+        <label for="final" class="form-label">📚 Final Exam (40%)</label>
+        <input type="number" id="final" class="form-control" name="final_exam" min="0" max="100" step="0.01" required>
+      </div>
+      <div class="col-md-3">
+        <label for="assignment" class="form-label">✍️ Assignment (20%)</label>
+        <input type="number" id="assignment" class="form-control" name="assignment" min="0" max="100" step="0.01" required>
+      </div>
+      <div class="col-md-3">
+        <label for="quiz" class="form-label">📝 Quiz (10%)</label>
+        <input type="number" id="quiz" class="form-control" name="quiz" min="0" max="100" step="0.01" required>
+      </div>
+    </div>
+
+    <div class="text-center mb-4">
+      <span class="badge bg-info">Total: <span id="total">-</span></span>
+      <span class="badge bg-secondary ms-3">Letter: <span id="letter">-</span></span>
+    </div>
+
+    <div class="text-center">
+      <button type="submit" class="btn btn-success">✅ Submit Grade</button>
+      <a href="/dashboard" class="btn btn-outline-secondary ms-3">⬅️ Back</a>
+    </div>
+  </form>
 </div>
 
 <script>
   const mid = document.getElementById("mid");
-  const final = document.getElementById("final");
+  const finalExam = document.getElementById("final");
   const assignment = document.getElementById("assignment");
   const quiz = document.getElementById("quiz");
 
-  const totalSpan = document.getElementById("total");
-  const letterSpan = document.getElementById("letter");
-
-  function calculateGrade() {
+  function calcGrade() {
     const m = parseFloat(mid.value) || 0;
-    const f = parseFloat(final.value) || 0;
+    const f = parseFloat(finalExam.value) || 0;
     const a = parseFloat(assignment.value) || 0;
     const q = parseFloat(quiz.value) || 0;
-
-    // Simple sum of all parts (no weighting)
-    const total = m + f + a + q;
-    totalSpan.textContent = total;
-
+    const total = +(m * 0.3 + f * 0.4 + a * 0.2 + q * 0.1).toFixed(2);
+    document.getElementById("total").innerText = total;
     let letter = "-";
-    if (total >= 92) letter = "A+";
-    else if (total >= 85) letter = "A";
-    else if (total >= 75) letter = "B+";
-    else if (total >= 65) letter = "B";
+    if (total >= 90) letter = "A+";
+    else if (total >= 80) letter = "A";
+    else if (total >= 70) letter = "B+";
+    else if (total >= 60) letter = "B";
     else if (total >= 50) letter = "C";
     else letter = "F";
-
-    letterSpan.textContent = letter;
+    document.getElementById("letter").innerText = letter;
   }
 
-  [mid, final, assignment, quiz].forEach(input => {
-    input.addEventListener("input", calculateGrade);
-  });
-
-  calculateGrade(); // initial calculation on page load
+  [mid, finalExam, assignment, quiz].forEach(el => el.addEventListener("input", calcGrade));
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
-
-</body>
-</html>
+{% endblock %}
