@@ -1,14 +1,8 @@
-# db_config.py
-
 import mysql.connector
 from mysql.connector import Error
 import os
 
 def create_connection():
-    """
-    Establishes and returns a MySQL database connection using environment variables.
-    Falls back to Clever Cloud MySQL defaults if environment variables are missing.
-    """
     try:
         connection = mysql.connector.connect(
             host=os.environ.get("DB_HOST", "be9h1kqjuuxzkpadgkcc-mysql.services.clever-cloud.com"),
@@ -18,8 +12,8 @@ def create_connection():
             port=int(os.environ.get("DB_PORT", 3306))
         )
         if connection.is_connected():
-            print("✅ Connected to Clever Cloud MySQL database")
+            print("✅ Connected to MySQL")
             return connection
     except Error as e:
-        print(f"❌ Error connecting to database: {e}")
+        print(f"❌ MySQL connection error: {e}")
         return None
