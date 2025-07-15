@@ -1,7 +1,6 @@
-import os
+import os 
 import io
 import pandas as pd
-from functools import wraps
 from flask import Flask, render_template, request, redirect, session, send_file
 from db_config import create_connection
 from passlib.context import CryptContext
@@ -9,17 +8,6 @@ from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 app = Flask(__name__, template_folder='templates')
 app.secret_key = "my-dev-secret-key"
-
-# Role-based access decorator
-def role_required(role):
-    def wrapper(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if session.get('role') != role:
-                return redirect('/login')
-            return f(*args, **kwargs)
-        return decorated_function
-    return wrapper
 
 def create_default_admin():
     conn = create_connection()
@@ -99,9 +87,264 @@ def dashboard():
         return render_template('admin_dashboard.html', name=session['name'])
     return redirect('/login')
 
+@app.route('/add-course', methods=['GET', 'POST'])
+def add_course():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    message = error = None
+    if request.method == 'POST':
+        course_name = request.form['course_name']
+        department = request.form.get('department', 'Unknown')
+        try:
+            cursor.execute("INSERT INTO courses (course_name, teacher_id, department) VALUES (%s, %s, %s)",
+                           (course_name, session['user_id'], department))
+            conn.commit()
+            message = "✅ Course added successfully!"
+        except Exception as e:
+            error = f"❌ Error: {str(e)}"
+    cursor.close()
+    conn.close()
+    return render_template('add_course.html', message=message, error=error)
+
+@app.route('/admin/courses')
+def manage_courses():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT c.id, c.course_name, c.department, u.name AS teacher_name FROM courses c JOIN users u ON c.teacher_id = u.id")
+    courses = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template("admin_courses.html", courses=courses)
+
+@app.route('/add-grade', methods=['GET', 'POST'])
+def add_grade():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, name FROM students")
+    students = cursor.fetchall()
+    cursor.execute("SELECT id, course_name FROM courses WHERE teacher_id = %s", (session['user_id'],))
+    courses = cursor.fetchall()
+    message = error = None
+    if request.method == 'POST':
+        try:
+            student_id = int(request.form['student_id'])
+            course_id = int(request.form['course_id'])
+            mid = float(request.form['mid_exam'])
+            final = float(request.form['final_exam'])
+            assignment = float(request.form['assignment'])
+            quiz = float(request.form['quiz'])
+            total = round(mid * 0.3 + final * 0.4 + assignment * 0.2 + quiz * 0.1, 2)
+            cursor.execute("""
+                INSERT INTO grades (student_id, course_id, mid_exam, final_exam, assignment, quiz, grade)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (student_id, course_id, mid, final, assignment, quiz, total))
+            conn.commit()
+            message = f"✅ Grade submitted! Total: {total}"
+        except Exception as e:
+            error = f"❌ Error: {str(e)}"
+    cursor.close()
+    conn.close()
+    return render_template('add_grade.html', students=students, courses=courses, message=message, error=error)
+
+@app.route('/view-grades')
+def view_grades():
+    if session.get('role') != 'student':
+        return redirect('/login')
+
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
+        student = cursor.fetchone()
+        if not student:
+            return "❌ Student not found."
+
+        cursor.execute("""
+            SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+            FROM grades g 
+            JOIN courses c ON g.course_id = c.id 
+            WHERE g.student_id = %s
+        """, (student['id'],))
+        grades = cursor.fetchall()
+
+        def grade_to_letter(g):
+            if g is None:
+                return "-"
+            g = float(g)
+            if g >= 90: return "A+"
+            elif g >= 80: return "A"
+            elif g >= 70: return "B+"
+            elif g >= 60: return "B"
+            elif g >= 50: return "C"
+            else: return "F"
+
+        cleaned_grades = []
+        for g in grades:
+            mid = g.get('mid_exam') or 0
+            final = g.get('final_exam') or 0
+            assignment = g.get('assignment') or 0
+            quiz = g.get('quiz') or 0
+            total = mid + final + assignment + quiz
+            cleaned_grades.append({
+                'course_name': g.get('course_name', 'N/A'),
+                'mid_exam': mid,
+                'final_exam': final,
+                'assignment': assignment,
+                'quiz': quiz,
+                'total_grade': total,
+                'letter': grade_to_letter(total)
+            })
+
+        average = round(sum(g['total_grade'] for g in cleaned_grades) / len(cleaned_grades), 2) if cleaned_grades else None
+
+        return render_template(
+            'view_grades.html',
+            grades=cleaned_grades,
+            name=session.get('name', 'Student'),
+            average=average
+        )
+
+    except Exception as e:
+        return f"❌ Internal error in view-grades: {type(e).__name__} - {e}"
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
+
+@app.route('/admin/view-all-grades')
+def view_all_grades():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    try:
+        conn = create_connection()
+        if conn is None:
+            return "❌ Database connection failed."
+
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT s.name AS student_name, s.email, 
+                   c.course_name, 
+                   g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+            FROM grades g
+            JOIN students s ON g.student_id = s.id
+            JOIN courses c ON g.course_id = c.id
+        """)
+        all_grades = cursor.fetchall()
+
+        # Grade to letter conversion
+        def letter(g):
+            if g is None:
+                return "-"
+            g = float(g)
+            if g >= 92: return "A+"
+            elif g >= 85: return "A"
+            elif g >= 75: return "B+"
+            elif g >= 65: return "B"
+            elif g >= 50: return "C"
+            else: return "F"
+
+        # Add total and letter grade
+        for row in all_grades:
+            mid = row.get('mid_exam') or 0
+            final = row.get('final_exam') or 0
+            assignment = row.get('assignment') or 0
+            quiz = row.get('quiz') or 0
+            total = round(mid + final + assignment + quiz, 2)
+            row['total'] = total
+            row['letter'] = letter(total)
+
+        return render_template('admin_all_grades.html', grades=all_grades)
+
+    except Exception as e:
+        return f"🔥 Internal Server Error:<br><code>{type(e).__name__}: {str(e)}</code>"
+
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
+
+@app.route('/download-grades')
+def download_grades():
+    if session.get('role') != 'student':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id FROM students WHERE email = %s", (session['email'],))
+    student = cursor.fetchone()
+    if not student:
+        return "❌ Student not found."
+    cursor.execute("""
+        SELECT c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+        FROM grades g
+        JOIN courses c ON g.course_id = c.id
+        WHERE g.student_id = %s
+    """, (student['id'],))
+    grades = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    df = pd.DataFrame(grades)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    output.seek(0)
+    return send_file(output, download_name=f"{session['name']}_grades.xlsx", as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/students')
+def admin_students():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM students")
+    students = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template("admin_students.html", students=students)
+
+@app.route('/admin/teachers')
+def admin_teachers():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    if conn is None:
+        return "❌ Database connection failed."
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM users WHERE role = 'teacher'")
+    teachers = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template("admin_teachers.html", teachers=teachers)
+
 @app.route('/admin')
-@role_required('admin')
 def admin():
+    if session.get('role') != 'admin':
+        return redirect('/login')
     return render_template('admin_dashboard.html', name=session['name'])
 
 @app.route('/logout')
