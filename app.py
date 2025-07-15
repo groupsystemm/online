@@ -232,42 +232,57 @@ def view_grades():
 def view_all_grades():
     if session.get('role') != 'admin':
         return redirect('/login')
-    conn = create_connection()
-    if conn is None:
-        return "❌ Database connection failed."
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT s.name AS student_name, s.email, c.course_name,
-               g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
-        FROM grades g
-        JOIN students s ON g.student_id = s.id
-        JOIN courses c ON g.course_id = c.id
-    """)
-    all_grades = cursor.fetchall()
-    cursor.close()
-    conn.close()
 
-    def letter(g):
-        if g is None:
-            return "-"
-        g = float(g)
-        if g >= 92: return "A+"
-        elif g >= 85: return "A"
-        elif g >= 75: return "B+"
-        elif g >= 65: return "B"
-        elif g >= 50: return "C"
-        else: return "F"
+    try:
+        conn = create_connection()
+        if conn is None:
+            return "❌ Database connection failed."
 
-    for row in all_grades:
-        mid = row.get('mid_exam') or 0
-        final = row.get('final_exam') or 0
-        assignment = row.get('assignment') or 0
-        quiz = row.get('quiz') or 0
-        total = round(mid + final + assignment + quiz, 2)
-        row['total'] = total
-        row['letter'] = letter(total)
+        cursor = conn.cursor(dictionary=True)
 
-    return render_template('admin_all_grades.html', grades=all_grades)
+        cursor.execute("""
+            SELECT s.name AS student_name, s.email, 
+                   c.course_name, 
+                   g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+            FROM grades g
+            JOIN students s ON g.student_id = s.id
+            JOIN courses c ON g.course_id = c.id
+        """)
+        all_grades = cursor.fetchall()
+
+        # Grade to letter conversion
+        def letter(g):
+            if g is None:
+                return "-"
+            g = float(g)
+            if g >= 92: return "A+"
+            elif g >= 85: return "A"
+            elif g >= 75: return "B+"
+            elif g >= 65: return "B"
+            elif g >= 50: return "C"
+            else: return "F"
+
+        # Add total and letter grade
+        for row in all_grades:
+            mid = row.get('mid_exam') or 0
+            final = row.get('final_exam') or 0
+            assignment = row.get('assignment') or 0
+            quiz = row.get('quiz') or 0
+            total = round(mid + final + assignment + quiz, 2)
+            row['total'] = total
+            row['letter'] = letter(total)
+
+        return render_template('admin_all_grades.html', grades=all_grades)
+
+    except Exception as e:
+        return f"🔥 Internal Server Error:<br><code>{type(e).__name__}: {str(e)}</code>"
+
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
 
 @app.route('/download-grades')
 def download_grades():
