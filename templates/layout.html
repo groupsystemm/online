@@ -13,11 +13,14 @@
 </head>
 <body class="bg-light">
 
-  <!-- ✅ Optional Navbar (visible if user is logged in) -->
-  {% if session.get('user_id') %}
+  <!-- ✅ Navbar (visible if logged in and not on login page) -->
+  {% if session.get('user_id') and request.endpoint != 'login' %}
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/dashboard">📘 GradeSystem</a>
+      <a class="navbar-brand d-flex align-items-center" href="/dashboard">
+        <img src="{{ url_for('static', filename='images/ga.png') }}" alt="Logo" style="height: 30px;" class="me-2">
+        📘 GradeSystem
+      </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -44,5 +47,8 @@
 
   <!-- ✅ Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Optional Page Scripts -->
+  {% block scripts %}{% endblock %}
 </body>
 </html>
