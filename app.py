@@ -38,12 +38,10 @@ def login():
     session.clear()
     error = None
     if request.method == 'POST':
-        email = request.form['email'].strip().lower()
-        password = request.form['password']
-
-        conn = None
-        cursor = None
         try:
+            email = request.form['email'].strip().lower()
+            password = request.form['password']
+
             conn = create_connection()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
@@ -59,15 +57,15 @@ def login():
                 return redirect('/dashboard')
             else:
                 error = 'Invalid email or password'
-        except Exception as e:
-            error = f"Internal error: {str(e)}"
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
+
+            cursor.close()
+            conn.close()
+        except Exception:
+            error = "Internal Server Error. Please try again."
+            print(traceback.format_exc())  # This prints full traceback in console
 
     return render_template('login.html', error=error)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
