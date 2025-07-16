@@ -27,22 +27,34 @@ def home():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    session.clear()  # ✅ Clear old session to hide navbar
+
     error = None
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
         password = request.form['password']
+
         conn = create_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
         user = cursor.fetchone()
+
         if user and pwd_context.verify(password, user['password']):
-            session.update({'user_id': user['id'], 'role': user['role'], 'name': user['name'], 'email': user['email']})
+            session.update({
+                'user_id': user['id'],
+                'role': user['role'],
+                'name': user['name'],
+                'email': user['email']
+            })
             return redirect('/dashboard')
         else:
             error = 'Invalid email or password'
+
         cursor.close()
         conn.close()
+
     return render_template('login.html', error=error)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
