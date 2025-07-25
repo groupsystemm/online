@@ -1,48 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>All Students - Admin Panel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
   <style>
-    .admin { color: red; font-weight: bold; }
-    .teacher { color: blue; font-weight: bold; }
-    .student { color: green; font-weight: bold; }
+    /* Role color coding */
+    .admin {
+      color: #dc3545; /* bootstrap danger red */
+      font-weight: 700;
+    }
+    .teacher {
+      color: #0d6efd; /* bootstrap primary blue */
+      font-weight: 700;
+    }
+    .student {
+      color: #198754; /* bootstrap success green */
+      font-weight: 700;
+    }
   </style>
 </head>
 <body class="bg-light">
 
   <div class="container mt-5">
-    <div class="bg-white p-4 rounded shadow">
-      <h2 class="mb-4 text-center">📋 All Registered Students</h2>
+    <div class="bg-white p-4 rounded shadow-sm">
+      <h2 class="mb-4 text-center fw-bold">📋 All Registered Students</h2>
 
-      <table class="table table-bordered table-striped">
-        <thead class="table-dark">
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for student in students %}
-          <tr>
-            <td>{{ student.id }}</td>
-            <td>{{ student.name }}</td>
-            <td>{{ student.email }}</td>
-            <td class="{{ student.role|lower }}">{{ student.role }}</td>
-          </tr>
+      <!-- Filter by Year -->
+      <form method="GET" class="mb-4 d-flex justify-content-center align-items-center gap-3 flex-wrap">
+        <label for="year-filter" class="fw-semibold mb-0">Filter by Year:</label>
+        <select
+          name="year"
+          id="year-filter"
+          class="form-select w-auto"
+          style="min-width: 120px;"
+          onchange="this.form.submit()"
+        >
+          {% for y in years %}
+            <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
           {% endfor %}
-        </tbody>
-      </table>
+        </select>
+        <noscript>
+          <button type="submit" class="btn btn-primary">Filter</button>
+        </noscript>
+      </form>
+
+      <!-- Students Table -->
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle text-center">
+          <thead class="table-dark">
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col" class="text-start">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">Role</th>
+              <th scope="col">Year</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in students %}
+            <tr>
+              <td>{{ student.id }}</td>
+              <td class="text-start">{{ student.name }}</td>
+              <td>{{ student.email }}</td>
+              <td class="{{ student.role|lower }} text-capitalize">{{ student.role }}</td>
+              <td>{{ student.year or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted fst-italic">No students found for the selected year.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
       <div class="text-center mt-4">
-        <a href="/admin" class="btn btn-secondary">⬅ Back to Admin Dashboard</a>
+        <a href="/admin" class="btn btn-outline-secondary">⬅ Back to Admin Dashboard</a>
       </div>
     </div>
   </div>
