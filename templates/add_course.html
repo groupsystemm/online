@@ -26,6 +26,17 @@
               <input type="text" id="courseName" name="course_name" class="form-control"
                      placeholder="Enter course name" required>
             </div>
+
+            <!-- Department Dropdown (Required) -->
+            <div class="mb-4">
+              <label for="department" class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
+              <select id="department" name="department" class="form-select" required>
+                <option value="" disabled selected>Select Department</option>
+                {% for dept in departments %}
+                  <option value="{{ dept.name }}">{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
 
           <!-- Right Column (Optional Fields) -->
