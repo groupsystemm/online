@@ -1,0 +1,54 @@
+{% extends 'layout.html' %}
+
+{% block title %}Edit Student{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-3">✏️ Edit Student - {{ student.name }}</h3>
+
+  {% if message %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% elif error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {{ error }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endif %}
+
+  <form method="POST">
+    <div class="mb-3">
+      <label for="name" class="form-label">Full Name</label>
+      <input type="text" class="form-control" id="name" name="name" value="{{ student.name }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="email" class="form-label">Email</label>
+      <input type="email" class="form-control" id="email" name="email" value="{{ student.email }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="year" class="form-label">Academic Year</label>
+      <select id="year" name="year" class="form-select" required>
+        {% for y in years %}
+          <option value="{{ y }}" {% if student.year == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-4">
+      <label for="department" class="form-label">Department</label>
+      <select id="department" name="department" class="form-select" required>
+        {% for dept in departments %}
+          <option value="{{ dept.name }}" {% if student.department == dept.name %}selected{% endif %}>{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">💾 Update Student</button>
+    <a href="{{ url_for('admin_students') }}" class="btn btn-secondary ms-2">⬅ Back</a>
+  </form>
+</div>
+{% endblock %}
