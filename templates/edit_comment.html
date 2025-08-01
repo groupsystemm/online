@@ -1,1 +1,31 @@
+{% extends 'layout.html' %}
+
+{% block title %}Add/Edit Comment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-3">📝 Comment for Student ID: {{ student_id }}, Course ID: {{ course_id }}</h3>
+
+  {% if message %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% elif error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {{ error }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endif %}
+
+  <form method="POST">
+    <div class="mb-3">
+      <label for="comment" class="form-label">Comment</label>
+      <textarea id="comment" name="comment" class="form-control" rows="5" required>{{ existing.comment if existing else '' }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">💾 Save Comment</button>
+    <a href="{{ url_for('some_relevant_view') }}" class="btn btn-secondary ms-2">⬅ Back</a>
+  </form>
+</div>
+{% endblock %}
 
