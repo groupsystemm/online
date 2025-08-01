@@ -1,14 +1,25 @@
-import os 
+import os
 import io
 import pandas as pd
-from flask import Flask, render_template, request, redirect, session, send_file
+from flask import Flask, render_template, request, redirect, session, send_file, url_for
 from db_config import create_connection
 from passlib.context import CryptContext
+from werkzeug.utils import secure_filename
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# --- Flask Setup ---
 app = Flask(__name__, template_folder='templates')
 app.secret_key = "my-dev-secret-key"
 
+# --- Upload Config ---
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# --- Password Hashing ---
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+# --- Default Admin Setup ---
 def create_default_admin():
     conn = create_connection()
     cursor = conn.cursor(dictionary=True)
@@ -21,6 +32,10 @@ def create_default_admin():
     cursor.close()
     conn.close()
 
+
+# --- Helpers ---
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 @app.route('/')
 def home():
     return redirect('/login')
@@ -163,6 +178,11 @@ def add_course():
     cursor.close()
     conn.close()
     return render_template('add_course.html', message=message, error=error, departments=departments)
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    return render_template('admin_dashboard.html')
 
 @app.route('/admin/courses')
 def manage_courses():
@@ -185,16 +205,16 @@ def students_by_department():
     conn = create_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Get departments for dropdown
+    # Get all departments
     cursor.execute("SELECT name FROM departments")
     departments = cursor.fetchall()
 
     students = []
     if selected_dept and selected_dept != "All":
-        cursor.execute("SELECT name, department FROM students WHERE department = %s", (selected_dept,))
+        cursor.execute("SELECT id, name, department FROM students WHERE department = %s", (selected_dept,))
         students = cursor.fetchall()
     elif selected_dept == "All":
-        cursor.execute("SELECT name, department FROM students")
+        cursor.execute("SELECT id, name, department FROM students")
         students = cursor.fetchall()
 
     cursor.close()
@@ -202,10 +222,11 @@ def students_by_department():
 
     return render_template(
         "students_by_department.html",
-        departments=departments,
+        all_departments=departments,
         students=students,
         selected_dept=selected_dept
     )
+
 
 @app.route('/add-grade', methods=['GET', 'POST'])
 def add_grade():
@@ -219,22 +240,24 @@ def add_grade():
     cursor.execute("SELECT name FROM departments")
     departments = cursor.fetchall()
 
-    # Get selected department from query string
     selected_department = request.args.get('department')
 
-    # Get teacher's courses by department (or all if none selected)
+    # Get teacher's courses filtered by department if selected
     if selected_department:
-        cursor.execute("SELECT id, course_name FROM courses WHERE teacher_id = %s AND department = %s",
-                       (session['user_id'], selected_department))
+        cursor.execute(
+            "SELECT id, course_name, department FROM courses WHERE teacher_id = %s AND department = %s",
+            (session['user_id'], selected_department)
+        )
     else:
-        cursor.execute("SELECT id, course_name, department FROM courses WHERE teacher_id = %s",
-                       (session['user_id'],))
+        cursor.execute(
+            "SELECT id, course_name, department FROM courses WHERE teacher_id = %s",
+            (session['user_id'],)
+        )
     courses = cursor.fetchall()
 
-    # Use department from URL or fallback to the first course's department
+    # Determine which department's students to show
     dept_for_students = selected_department or (courses[0]['department'] if courses else None)
 
-    # Get students from that department
     if dept_for_students:
         cursor.execute("SELECT id, name FROM students WHERE department = %s", (dept_for_students,))
         students = cursor.fetchall()
@@ -242,23 +265,28 @@ def add_grade():
         students = []
 
     message = error = None
+
     if request.method == 'POST':
         try:
             student_id = int(request.form['student_id'])
             course_id = int(request.form['course_id'])
             semester = request.form['semester']
-            mid = float(request.form['mid_exam'])
-            final = float(request.form['final_exam'])
+            mid_exam = float(request.form['mid_exam'])
+            final_exam = float(request.form['final_exam'])
             assignment = float(request.form['assignment'])
             quiz = float(request.form['quiz'])
-            total = round(mid * 0.3 + final * 0.4 + assignment * 0.2 + quiz * 0.1, 2)
 
+            # 🔁 Total = Simple Sum (not percentage)
+            total_grade = round(mid_exam + final_exam + assignment + quiz, 2)
+
+            # Insert the grade record
             cursor.execute("""
-                INSERT INTO grades (student_id, course_id, mid_exam, final_exam, assignment, quiz, grade)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (student_id, course_id, mid, final, assignment, quiz, total))
+                INSERT INTO grades (student_id, course_id, semester, mid_exam, final_exam, assignment, quiz, grade)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (student_id, course_id, semester, mid_exam, final_exam, assignment, quiz, total_grade))
             conn.commit()
-            message = f"✅ Grade submitted successfully! Total: {total}"
+
+            message = f"✅ Grade submitted successfully! Total: {total_grade}"
         except Exception as e:
             error = f"❌ Error: {str(e)}"
 
@@ -274,6 +302,7 @@ def add_grade():
         message=message,
         error=error
     )
+
 
 @app.route('/view-grades')
 def view_grades():
@@ -333,37 +362,40 @@ def view_all_grades():
         return redirect('/login')
 
     selected_dept = request.args.get('department')
+    message = request.args.get('message')
+    error = request.args.get('error')
 
     conn = create_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Load all departments for filter dropdown
+    # Get all departments for filter dropdown
     cursor.execute("SELECT name FROM departments")
     departments = cursor.fetchall()
 
-    # Query grades filtered by department
-    if selected_dept and selected_dept != "All":
-        cursor.execute("""
-            SELECT s.name AS student_name, s.email, s.department, 
-                   c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
-            FROM grades g
-            JOIN students s ON g.student_id = s.id
-            JOIN courses c ON g.course_id = c.id
-            WHERE s.department = %s
-        """, (selected_dept,))
-    else:
-        cursor.execute("""
-            SELECT s.name AS student_name, s.email, s.department, 
-                   c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
-            FROM grades g
-            JOIN students s ON g.student_id = s.id
-            JOIN courses c ON g.course_id = c.id
-        """)
+    # Build query for grades with optional department filter
+    query = """
+        SELECT s.id AS student_id, c.id AS course_id,
+               s.name AS student_name, s.email, s.department, 
+               c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade,
+               cm.comment
+        FROM grades g
+        JOIN students s ON g.student_id = s.id
+        JOIN courses c ON g.course_id = c.id
+        LEFT JOIN comments cm ON cm.student_id = g.student_id AND cm.course_id = g.course_id
+    """
+    params = []
 
+    if selected_dept and selected_dept != "All":
+        query += " WHERE s.department = %s"
+        params.append(selected_dept)
+
+    cursor.execute(query, params)
     grades = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
+    # Add total and letter grade
     def letter(g):
         if g is None:
             return "-"
@@ -381,7 +413,15 @@ def view_all_grades():
         row['total'] = total
         row['letter'] = letter(total)
 
-    return render_template("admin_all_grades.html", grades=grades, departments=departments, selected_dept=selected_dept)
+    return render_template(
+        "admin_all_grades.html",
+        grades=grades,
+        departments=departments,
+        selected_dept=selected_dept,
+        message=message,
+        error=error
+    )
+
 
 @app.route('/download-grades')
 def download_grades():
@@ -450,31 +490,725 @@ def admin_teachers():
 def manage_departments():
     if session.get('role') != 'admin':
         return redirect('/login')
-    
+
     conn = create_connection()
     cursor = conn.cursor(dictionary=True)
     message = error = None
 
     if request.method == 'POST':
-        dept_name = request.form['department_name'].strip()
-        try:
-            cursor.execute("INSERT INTO departments (name) VALUES (%s)", (dept_name,))
-            conn.commit()
-            message = "✅ Department added successfully!"
-        except Exception as e:
-            error = f"❌ {str(e)}"
+        dept_name = request.form.get('department_name', '').strip()
+        if dept_name:
+            try:
+                cursor.execute("INSERT INTO departments (name) VALUES (%s)", (dept_name,))
+                conn.commit()
+                message = "✅ Department added successfully!"
+            except Exception as e:
+                error = f"❌ {str(e)}"
+        else:
+            error = "❌ Department name cannot be empty."
 
-    cursor.execute("SELECT * FROM departments")
+    cursor.execute("SELECT * FROM departments ORDER BY id")
     departments = cursor.fetchall()
+
     cursor.close()
     conn.close()
+
     return render_template("admin_departments.html", departments=departments, message=message, error=error)
+
+
+@app.route('/admin/delete-department/<int:dept_id>')
+def delete_department(dept_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM departments WHERE id = %s", (dept_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect('/admin/departments')
+
+
+@app.route('/admin/edit-department/<int:dept_id>', methods=['GET', 'POST'])
+def edit_department(dept_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM departments WHERE id = %s", (dept_id,))
+    department = cursor.fetchone()
+
+    if not department:
+        cursor.close()
+        conn.close()
+        return "❌ Department not found"
+
+    message = error = None
+
+    if request.method == 'POST':
+        new_name = request.form['department_name'].strip()
+        try:
+            cursor.execute("UPDATE departments SET name = %s WHERE id = %s", (new_name, dept_id))
+            conn.commit()
+            message = "✅ Department updated successfully!"
+            department['name'] = new_name
+        except Exception as e:
+            conn.rollback()
+            error = f"❌ {str(e)}"
+
+    cursor.close()
+    conn.close()
+    return render_template("edit_department.html", department=department, message=message, error=error)
+
+
 
 @app.route('/admin')
 def admin():
     if session.get('role') != 'admin':
         return redirect('/login')
     return render_template('admin_dashboard.html', name=session['name'])
+@app.route('/admin/delete-student/<int:user_id>', methods=['GET'])
+def delete_student(user_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM students WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM users WHERE id = %s AND role = 'student'", (user_id,))
+        conn.commit()
+        message = "✅ Student deleted successfully!"
+    except Exception as e:
+        conn.rollback()
+        message = f"❌ Error deleting student: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(f"/admin/students?message={message}")
+
+
+@app.route('/admin/edit-student/<int:user_id>', methods=['GET', 'POST'])
+def edit_student(user_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Get departments for dropdown
+    cursor.execute("SELECT name FROM departments")
+    departments = cursor.fetchall()
+
+    # Get student info joining by email, linking users and students
+    cursor.execute("""
+        SELECT u.id, u.name, u.email, s.year, s.department
+        FROM users u
+        LEFT JOIN students s ON u.email = s.email
+        WHERE u.id = %s AND u.role = 'student'
+    """, (user_id,))
+    student = cursor.fetchone()
+
+    # Redirect to students list if student not found (instead of showing error)
+    if not student:
+        cursor.close()
+        conn.close()
+        return redirect('/admin/students?error=Student+not+found')
+
+    message = error = None
+    years = [str(y) for y in range(2014, 2025)]
+
+    if request.method == 'POST':
+        try:
+            name = request.form['name'].strip()
+            email = request.form['email'].strip().lower()
+            year = request.form.get('year')
+            department = request.form.get('department')
+
+            # Update users table (name and email)
+            cursor.execute("UPDATE users SET name=%s, email=%s WHERE id=%s", (name, email, user_id))
+
+            # Update students table (name, email, year, department) by old email
+            cursor.execute("""
+                UPDATE students
+                SET name=%s, email=%s, year=%s, department=%s
+                WHERE email=%s
+            """, (name, email, year, department, student['email']))
+
+            conn.commit()
+
+            student.update({'name': name, 'email': email, 'year': year, 'department': department})
+            message = "✅ Student updated successfully!"
+        except Exception as e:
+            conn.rollback()
+            error = f"❌ {str(e)}"
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "edit_student.html",
+        student=student,
+        years=years,
+        departments=departments,
+        message=message,
+        error=error
+    )
+
+
+@app.route('/add-comment/<int:student_id>/<int:course_id>', methods=['GET', 'POST'])
+@app.route('/edit-comment/<int:student_id>/<int:course_id>', methods=['GET', 'POST'])
+def comment_form(student_id, course_id):
+    if session.get('role') not in ['teacher', 'admin']:
+        return redirect('/login')
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    message = error = None
+
+    cursor.execute("""
+        SELECT * FROM comments WHERE student_id=%s AND course_id=%s
+    """, (student_id, course_id))
+    existing = cursor.fetchone()
+
+    if request.method == 'POST':
+        comment = request.form['comment'].strip()
+        try:
+            if existing:
+                cursor.execute("""
+                    UPDATE comments SET comment=%s WHERE student_id=%s AND course_id=%s
+                """, (comment, student_id, course_id))
+            else:
+                cursor.execute("""
+                    INSERT INTO comments (student_id, course_id, comment)
+                    VALUES (%s, %s, %s)
+                """, (student_id, course_id, comment))
+            conn.commit()
+            message = "✅ Comment saved successfully."
+        except Exception as e:
+            conn.rollback()
+            error = f"❌ Error: {str(e)}"
+
+    cursor.close()
+    conn.close()
+    return render_template("comment_form.html", message=message, error=error, student_id=student_id, course_id=course_id, existing=existing)
+@app.route('/admin/edit-teacher/<int:user_id>', methods=['GET', 'POST'])
+def edit_teacher(user_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM users WHERE id=%s AND role='teacher'", (user_id,))
+    teacher = cursor.fetchone()
+
+    message = error = None
+    if not teacher:
+        return "❌ Teacher not found"
+
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email'].strip().lower()
+        try:
+            cursor.execute("UPDATE users SET name=%s, email=%s WHERE id=%s", (name, email, user_id))
+            cursor.execute("UPDATE teachers SET name=%s, email=%s WHERE email=%s", (name, email, teacher['email']))
+            conn.commit()
+            message = "✅ Teacher updated successfully!"
+        except Exception as e:
+            conn.rollback()
+            error = f"❌ {str(e)}"
+
+    cursor.close()
+    conn.close()
+    return render_template("edit_teacher.html", teacher=teacher, message=message, error=error)
+@app.route('/admin/delete-teacher/<int:user_id>')
+def delete_teacher(user_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM teachers WHERE email=(SELECT email FROM users WHERE id=%s)", (user_id,))
+        cursor.execute("DELETE FROM users WHERE id=%s AND role='teacher'", (user_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+    cursor.close()
+    conn.close()
+    return redirect('/admin/teachers')
+
+@app.route('/admin/export-grades')
+def export_all_grades():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT s.name AS student_name, s.email, s.department,
+               c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz, g.grade
+        FROM grades g
+        JOIN students s ON g.student_id = s.id
+        JOIN courses c ON g.course_id = c.id
+    """)
+    rows = cursor.fetchall()
+    df = pd.DataFrame(rows)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='All Grades')
+    output.seek(0)
+    return send_file(output, download_name='all_grades.xlsx', as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/delete-grade/<int:student_id>/<int:course_id>', methods=['POST', 'GET'])
+def delete_grade(student_id, course_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "DELETE FROM grades WHERE student_id = %s AND course_id = %s",
+            (student_id, course_id)
+        )
+        conn.commit()
+        message = "✅ Grade deleted successfully!"
+        return redirect(f"/admin/view-all-grades?message={message}")
+    except Exception as e:
+        conn.rollback()
+        error = f"❌ Error deleting grade: {str(e)}"
+        return redirect(f"/admin/view-all-grades?error={error}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# EDIT GRADE
+@app.route('/edit-grade/<int:student_id>/<int:course_id>', methods=['GET', 'POST'])
+def edit_grade(student_id, course_id):
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        if request.method == 'POST':
+            mid = request.form['mid']
+            final = request.form['final']
+            assignment = request.form['assignment']
+            quiz = request.form['quiz']
+            cursor.execute("""
+                UPDATE grades SET mid_exam=%s, final_exam=%s, assignment=%s, quiz=%s
+                WHERE student_id=%s AND course_id=%s
+            """, (mid, final, assignment, quiz, student_id, course_id))
+            conn.commit()
+            return redirect('/admin/view-all-grades')
+
+        cursor.execute("""
+            SELECT s.name AS student_name, c.course_name, g.mid_exam, g.final_exam, g.assignment, g.quiz
+            FROM grades g
+            JOIN students s ON g.student_id = s.id
+            JOIN courses c ON g.course_id = c.id
+            WHERE g.student_id = %s AND g.course_id = %s
+        """, (student_id, course_id))
+        grade = cursor.fetchone()
+        if grade:
+            return render_template('edit_grade.html', grade=grade)
+        else:
+            return "Grade not found", 404
+    finally:
+        cursor.close()
+        conn.close()
+# 📝 Edit Course
+@app.route('/admin/edit-course/<int:course_id>', methods=['GET', 'POST'])
+def edit_course(course_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        course_name = request.form['course_name']
+        teacher_id = request.form['teacher_id']
+        cursor.execute("UPDATE courses SET course_name = %s, teacher_id = %s WHERE id = %s",
+                       (course_name, teacher_id, course_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return redirect('/admin/courses')
+
+    cursor.execute("SELECT * FROM courses WHERE id = %s", (course_id,))
+    course = cursor.fetchone()
+
+    cursor.execute("SELECT id, name FROM users WHERE role = 'teacher'")
+    teachers = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+    return render_template('edit_course.html', course=course, teachers=teachers)
+# 🗑️ Delete Course
+@app.route('/admin/delete-course/<int:course_id>')
+def delete_course(course_id):
+    if session.get('role') != 'admin':
+        return redirect('/login')
+    
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM courses WHERE id = %s", (course_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect('/admin/courses')
+# Profile page route
+@app.route('/admin/profile', methods=['GET', 'POST'])
+def admin_profile():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    message = error = None
+
+    if request.method == 'POST':
+        file = request.files.get('profile_pic')
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+
+            try:
+                cursor.execute("UPDATE users SET profile_pic = %s WHERE id = %s", (filename, session['user_id']))
+                conn.commit()
+                message = "✅ Profile photo updated successfully."
+            except Exception as e:
+                error = f"❌ Error updating photo: {e}"
+        else:
+            error = "❌ Invalid file format."
+
+    # Fetch admin details
+    cursor.execute("SELECT name, email, profile_pic FROM users WHERE id = %s", (session['user_id'],))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    return render_template('admin_profile.html', user=user, message=message, error=error)
+# Settings page route
+@app.route('/admin/settings', methods=['GET', 'POST'])
+def admin_settings():
+    if session.get('role') != 'admin':
+        return redirect('/login')
+
+    message = error = None
+
+    if request.method == 'POST':
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+
+        if new_password != confirm_password:
+            error = "❌ Passwords do not match."
+        elif len(new_password) < 6:
+            error = "❌ Password must be at least 6 characters."
+        else:
+            hashed_pw = pwd_context.hash(new_password)
+            try:
+                conn = create_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET password = %s WHERE id = %s", (hashed_pw, session['user_id']))
+                conn.commit()
+                message = "✅ Password updated successfully!"
+            except Exception as e:
+                error = f"❌ {str(e)}"
+            finally:
+                cursor.close()
+                conn.close()
+
+    return render_template('admin_settings.html', message=message, error=error)
+@app.route('/teacher/submit-grade-with-course', methods=['GET', 'POST'])
+def submit_grade_with_course():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+
+    message = error = None
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        try:
+            # Course Info
+            course_name = request.form['course_name']
+            course_code = request.form['course_code']
+            department_id = request.form['department_id']
+
+            # Grade Info
+            student_id = request.form['student_id']
+            grade = request.form['grade']
+
+            # 1. Insert course
+            cursor.execute("INSERT INTO courses (name, code, department_id) VALUES (%s, %s, %s)",
+                           (course_name, course_code, department_id))
+            conn.commit()
+
+            # 2. Get course_id
+            cursor.execute("SELECT id FROM courses WHERE code = %s ORDER BY id DESC LIMIT 1", (course_code,))
+            course_id = cursor.fetchone()[0]
+
+            # 3. Insert grade
+            cursor.execute("INSERT INTO grades (student_id, course_id, grade) VALUES (%s, %s, %s)",
+                           (student_id, course_id, grade))
+            conn.commit()
+
+            message = "✅ Course and Grade submitted successfully!"
+
+        except Exception as e:
+            conn.rollback()
+            error = f"❌ Error: {str(e)}"
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    # Load departments and students for dropdown
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, name FROM departments")
+    departments = cursor.fetchall()
+    cursor.execute("SELECT id, name FROM users WHERE role='student'")
+    students = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return render_template("submit_grade_with_course.html", departments=departments, students=students, message=message, error=error)
+@app.route('/teacher/view-grades', methods=['GET'])
+def teacher_view_grades():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+
+    teacher_id = session.get('user_id')
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Get teacher's courses
+        cursor.execute("SELECT id, course_name FROM courses WHERE teacher_id = %s", (teacher_id,))
+        teacher_courses = cursor.fetchall()
+        course_ids = [course['id'] for course in teacher_courses]
+
+        if not course_ids:
+            return render_template('teacher_view_grades.html', grades=[], message="You have no courses assigned.")
+
+        format_strings = ','.join(['%s'] * len(course_ids))
+        cursor.execute(f"""
+            SELECT 
+                g.student_id, g.course_id, g.grade, g.comment,
+                s.name AS student_name, c.course_name
+            FROM grades g
+            JOIN students s ON g.student_id = s.id
+            JOIN courses c ON g.course_id = c.id
+            WHERE g.course_id IN ({format_strings})
+        """, tuple(course_ids))
+
+        grades = cursor.fetchall()
+
+    except Exception as e:
+        grades = []
+        print("Error:", str(e))
+    finally:
+        cursor.close()
+        conn.close()
+
+    return render_template('teacher_view_grades.html', grades=grades)
+
+
+@app.route('/teacher/add-comment/<int:student_id>/<int:course_id>', methods=['POST'])
+def add_teacher_comment(student_id, course_id):
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+
+    teacher_id = session.get('user_id')
+    comment_text = request.form.get('comment', '').strip()
+
+    if not comment_text:
+        flash("Comment cannot be empty.", "danger")
+        return redirect(url_for('teacher_view_grades'))
+
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO comments (teacher_id, student_id, course_id, comment, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (teacher_id, student_id, course_id, comment_text, datetime.now()))
+
+        conn.commit()
+        flash("Comment added successfully.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        flash(f"Failed to add comment: {str(e)}", "danger")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('teacher_view_grades'))
+
+@app.route('/teacher/delete-grade/<int:student_id>/<int:course_id>')
+def teacher_delete_grade(student_id, course_id):
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM grades WHERE student_id = %s AND course_id = %s", (student_id, course_id))
+        conn.commit()
+    except:
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+    return redirect('/teacher/view-grades')
+@app.route('/teacher/edit-grade/<int:student_id>/<int:course_id>', methods=['GET', 'POST'])
+def teacher_edit_grade(student_id, course_id):
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        new_grade = request.form['grade']
+        try:
+            cursor.execute("UPDATE grades SET grade = %s WHERE student_id = %s AND course_id = %s",
+                           (new_grade, student_id, course_id))
+            conn.commit()
+        except:
+            conn.rollback()
+        finally:
+            cursor.close()
+            conn.close()
+        return redirect('/teacher/view-grades')
+
+    cursor.execute("""
+        SELECT g.*, u.name AS student_name, c.name AS course_name
+        FROM grades g
+        JOIN users u ON g.student_id = u.id
+        JOIN courses c ON g.course_id = c.id
+        WHERE g.student_id = %s AND g.course_id = %s
+    """, (student_id, course_id))
+    grade = cursor.fetchone()
+
+    return render_template("teacher_edit_grade.html", grade=grade)
+@app.route('/api/comments/<int:student_id>/<int:course_id>')
+def api_get_comments(student_id, course_id):
+    if session.get('role') != 'teacher':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT c.comment, DATE_FORMAT(c.created_at, '%Y-%m-%d %H:%i') AS created_at, u.name AS teacher_name
+        FROM comments c
+        JOIN users u ON c.teacher_id = u.id
+        WHERE c.student_id = %s AND c.course_id = %s
+        ORDER BY c.created_at DESC
+    """, (student_id, course_id))
+
+    comments = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return jsonify({'comments': comments})
+
+@app.route('/teacher/dashboard')
+def teacher_dashboard():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+    
+    # Get teacher name from session or fallback to 'Teacher'
+    name = session.get('name') or 'Teacher'
+    
+    return render_template('teacher_dashboard.html', name=name)
+@app.route('/add-course-grade', methods=['GET', 'POST'])
+def add_course_grade():
+    if session.get('role') != 'teacher':
+        return redirect('/login')
+    
+    conn = create_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    message = error = None
+
+    # Fetch departments for dropdowns
+    cursor.execute("SELECT name FROM departments")
+    departments = cursor.fetchall()
+
+    # Handle form submissions (determine which form was submitted)
+    if request.method == 'POST':
+        if 'add_course' in request.form:
+            # Add Course form submitted
+            course_name = request.form['course_name']
+            department = request.form['department']
+            teacher_id = session['user_id']
+            try:
+                cursor.execute(
+                    "INSERT INTO courses (course_name, department, teacher_id) VALUES (%s, %s, %s)",
+                    (course_name, department, teacher_id)
+                )
+                conn.commit()
+                message = f"✅ Course '{course_name}' added successfully!"
+            except Exception as e:
+                error = f"❌ Error adding course: {e}"
+
+        elif 'add_grade' in request.form:
+            # Add Grade form submitted
+            try:
+                student_id = int(request.form['student_id'])
+                course_id = int(request.form['course_id'])
+                semester = request.form['semester']
+                mid_exam = float(request.form['mid_exam'])
+                final_exam = float(request.form['final_exam'])
+                assignment = float(request.form['assignment'])
+                quiz = float(request.form['quiz'])
+
+                total_grade = round(mid_exam * 0.3 + final_exam * 0.4 + assignment * 0.2 + quiz * 0.1, 2)
+
+                cursor.execute("""
+                    INSERT INTO grades (student_id, course_id, semester, mid_exam, final_exam, assignment, quiz, grade)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (student_id, course_id, semester, mid_exam, final_exam, assignment, quiz, total_grade))
+                conn.commit()
+                message = f"✅ Grade added successfully! Total: {total_grade}"
+            except Exception as e:
+                error = f"❌ Error adding grade: {e}"
+
+    # For the Grade form dropdowns, get students and courses
+    cursor.execute("SELECT id, name FROM students")
+    students = cursor.fetchall()
+
+    cursor.execute("SELECT id, course_name FROM courses WHERE teacher_id = %s", (session['user_id'],))
+    courses = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'add_course_grade.html',
+        departments=departments,
+        students=students,
+        courses=courses,
+        message=message,
+        error=error
+    )
 
 @app.route('/logout')
 def logout():
