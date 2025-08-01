@@ -36,13 +36,14 @@ def create_default_admin():
 # --- Helpers ---
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-@app.route('/')
-def home():
-    return redirect('/login')
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
+
+    # ✅ Clear session when visiting login (especially for GET)
+    if request.method == 'GET':
+        session.clear()
+
     if request.method == 'POST':
         email = request.form['email'].strip().lower()
         password = request.form['password']
@@ -51,12 +52,18 @@ def login():
         cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
         user = cursor.fetchone()
         if user and pwd_context.verify(password, user['password']):
-            session.update({'user_id': user['id'], 'role': user['role'], 'name': user['name'], 'email': user['email']})
+            session.update({
+                'user_id': user['id'],
+                'role': user['role'],
+                'name': user['name'],
+                'email': user['email']
+            })
             return redirect('/dashboard')
         else:
             error = 'Invalid email or password'
         cursor.close()
         conn.close()
+
     return render_template('login.html', error=error)
 
 @app.route('/register', methods=['GET', 'POST'])
