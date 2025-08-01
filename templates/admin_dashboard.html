@@ -1,89 +1,124 @@
-{% extends "layout.html" %}
-{% block title %}Admin Dashboard{% endblock %}
+{% extends 'layout.html' %}
+
+{% block title %}📘 GradeSystem - Admin Panel{% endblock %}
 
 {% block content %}
-<div class="container dashboard-container mt-5">
-
-  <!-- Welcome Message -->
-  <div class="text-center mb-5">
-    <img src="{{ url_for('static', filename='images/gage.png') }}" alt="Gage Logo"
-         class="img-fluid mb-3" style="max-width: 120px; border-radius: 12px;">
-    <h2 class="fw-bold text-primary">👋 Welcome, {{ name }} <small class="text-muted">(Admin)</small></h2>
-    <p class="text-secondary">Gage University College Admin Dashboard</p>
-  </div>
-
-  <!-- Dashboard Options -->
-  <div class="row row-cols-1 row-cols-md-2 g-4 text-center">
-
-    <div class="col">
-      <a href="/admin/students" class="text-decoration-none">
-        <div class="card card-option shadow-sm p-4">
-          <div class="display-5">👨‍🎓</div>
-          <h5 class="fw-semibold text-dark mt-2">Manage Students</h5>
-        </div>
-      </a>
-    </div>
-
-    <div class="col">
-      <a href="/admin/teachers" class="text-decoration-none">
-        <div class="card card-option shadow-sm p-4">
-          <div class="display-5">👩‍🏫</div>
-          <h5 class="fw-semibold text-dark mt-2">Manage Teachers</h5>
-        </div>
-      </a>
-    </div>
-
-    <div class="col">
-      <a href="/admin/courses" class="text-decoration-none">
-        <div class="card card-option shadow-sm p-4">
-          <div class="display-5">📚</div>
-          <h5 class="fw-semibold text-dark mt-2">Manage Courses</h5>
-        </div>
-      </a>
-    </div>
-
-    <div class="col">
-      <a href="/admin/view-all-grades" class="text-decoration-none">
-        <div class="card card-option shadow-sm p-4">
-          <div class="display-5">📊</div>
-          <h5 class="fw-semibold text-dark mt-2">View All Grades</h5>
-        </div>
-      </a>
-    </div>
-
-    <div class="col">
-      <a href="/admin/students-by-department" class="text-decoration-none">
-        <div class="card card-option shadow-sm p-4">
-          <div class="display-5">🏢</div>
-          <h5 class="fw-semibold text-dark mt-2">Manage Departments</h5>
-        </div>
-      </a>
-    </div>
-
-  </div>
-
-  <!-- Logout Button -->
-  <div class="text-center mt-5">
-    <a href="/logout" class="btn btn-outline-danger btn-lg">🔓 Logout</a>
-  </div>
-</div>
-
-<!-- Custom Style -->
 <style>
   body {
-    background-color: #f4f6f9;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
 
-  .card-option {
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    border-radius: 15px;
+  .sidebar-fixed {
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    background-color: #343a40;
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .sidebar-fixed h4 {
+    color: #ffc107;
+  }
+
+  .sidebar-fixed a {
+    display: block;
+    padding: 10px;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+  }
+
+  .sidebar-fixed a:hover,
+  .sidebar-fixed a.active {
+    background-color: #495057;
+  }
+
+  .main-area {
+    margin-left: 250px;
+    padding: 30px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+  }
+
+  .topbar {
     background-color: #ffffff;
+    padding: 10px 20px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  .card-option:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  .gage-logo {
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #007bff;
   }
 </style>
+
+<!-- Sidebar -->
+<div class="sidebar-fixed">
+  <h4>📘 GradeSystem</h4>
+  <hr>
+  <p>👋 Welcome, <strong>{{ session['name'] }}</strong> (Admin)</p>
+  <a href="/admin/students">👨‍🎓 Manage Students</a>
+  <a href="/admin/teachers">👩‍🏫 Manage Teachers</a>
+  <a href="/admin/courses">📚 Manage Courses</a>
+  <a href="/admin/view-all-grades">📊 View All Grades</a>
+  <a href="/admin/departments">🏢 Manage Departments</a>
+  <a href="/admin/profile">👤 Profile</a>
+  <a href="/admin/settings">⚙️ Settings</a>
+  <a href="/logout" class="text-danger">🚪 Logout</a>
+</div>
+
+<!-- Main Content Area -->
+<div class="main-area">
+  <div class="topbar">
+    <div class="gage-logo">🎓 Gage University College</div>
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        ⚙️ Admin Actions
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="/admin/profile">👤 Profile</a></li>
+        <li><a class="dropdown-item" href="/admin/settings">⚙️ Settings</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="/logout">🚪 Logout</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <h4 class="mb-4">📘 Gage University College Admin Dashboard</h4>
+    <p class="lead">
+      Welcome to the Grade Management System. Use the sidebar to manage students, teachers, departments, and view all grades. Keep everything organized and up to date!
+    </p>
+
+    <div class="row text-center mt-4">
+      <div class="col-md-4 mb-3">
+        <a href="/admin/students" class="btn btn-outline-primary w-100">👨‍🎓 Manage Students</a>
+      </div>
+      <div class="col-md-4 mb-3">
+        <a href="/admin/teachers" class="btn btn-outline-primary w-100">👩‍🏫 Manage Teachers</a>
+      </div>
+      <div class="col-md-4 mb-3">
+        <a href="/admin/courses" class="btn btn-outline-primary w-100">📚 Manage Courses</a>
+      </div>
+      <div class="col-md-4 mb-3">
+        <a href="/admin/view-all-grades" class="btn btn-outline-success w-100">📊 View All Grades</a>
+      </div>
+      <div class="col-md-4 mb-3">
+        <a href="/admin/departments" class="btn btn-outline-secondary w-100">🏢 Manage Departments</a>
+      </div>
+      <div class="col-md-4 mb-3">
+        <a href="/logout" class="btn btn-outline-danger w-100">🚪 Logout</a>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
