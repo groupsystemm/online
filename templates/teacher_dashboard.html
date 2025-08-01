@@ -9,7 +9,128 @@
   }
 
   .btn-dashboard {
+    background-color: #2980b9;{% extends "layout.html" %}
+
+{% block title %}📘 Teacher Dashboard - Gage University College{% endblock %}
+
+{% block content %}
+<style>
+  body {
+    background-color: #f4f6f9;
+  }
+
+  .dashboard-container {
+    max-width: 1000px;
+    margin: 50px auto;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.07);
+    padding: 50px 40px;
+    text-align: center;
+  }
+
+  .logo {
+    max-width: 140px;
+    margin-bottom: 25px;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+  h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #2c3e50;
+  }
+
+  .welcome-message {
+    font-size: 18px;
+    margin-top: 8px;
+    color: #7f8c8d;
+  }
+
+  .dashboard-actions {
+    margin-top: 35px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    justify-content: center;
+  }
+
+  .dropdown-card {
+    background-color: #ecf0f1;
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(44, 62, 80, 0.08);
+  }
+
+  .dropdown-card:hover {
+    background-color: #dfe6e9;
+    transform: scale(1.03);
+  }
+
+  .dropdown-header {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .btn-dashboard {
+    display: block;
+    width: 100%;
+    padding: 12px 0;
+    margin: 6px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    background-color: #3498db;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.3s ease;
+  }
+
+  .btn-dashboard:hover {
     background-color: #2980b9;
+  }
+
+  .logout-btn {
+    background-color: #c0392b !important;
+  }
+
+  .logout-btn:hover {
+    background-color: #992d22 !important;
+  }
+</style>
+
+<div class="dashboard-container">
+  <img src="{{ url_for('static', filename='images/gage.png') }}" alt="Gage University Logo" class="logo" />
+
+  <h2>👋 Welcome, {{ name }} <small class="text-muted">(Teacher)</small></h2>
+  <p class="welcome-message">Welcome to the Gage University College Teacher Dashboard</p>
+
+  <div class="dashboard-actions">
+    <div class="dropdown-card">
+      <div class="dropdown-header">📚 Course Management</div>
+      <a href="/add-course" class="btn-dashboard">➕ Add Course</a>
+    </div>
+
+    <div class="dropdown-card">
+      <div class="dropdown-header">📝 Grade Management</div>
+      <a href="/add-grade" class="btn-dashboard">➕ Add Grade</a>
+      <a href="/teacher/submit-grade-with-course" class="btn-dashboard">➕📝 Add Course & Grade</a>
+      <a href="/teacher/view-grades" class="btn-dashboard">📊 View Grades</a>
+    </div>
+
+    <div class="dropdown-card">
+      <div class="dropdown-header">🔐 Account</div>
+      <a href="/logout" class="btn-dashboard logout-btn">🔓 Logout</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
     padding: 14px 24px;
     border-radius: 6px;
     font-weight: bold;
