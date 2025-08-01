@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+
+{% block title %}Add Course & Grade{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-4 text-center">➕ Add Course & 📝 Add Grade</h2>
+
+  {% if message %}
+  <div class="alert alert-success text-center">{{ message }}</div>
+  {% elif error %}
+  <div class="alert alert-danger text-center">{{ error }}</div>
+  {% endif %}
+
+  <div class="row">
+    <!-- Add Course Form -->
+    <div class="col-md-6">
+      <h4>📚 Add Course</h4>
+      <form method="POST">
+        <input type="hidden" name="add_course" value="1">
+        <div class="mb-3">
+          <label for="course_name" class="form-label">Course Name</label>
+          <input type="text" id="course_name" name="course_name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label for="department" class="form-label">Department</label>
+          <select id="department" name="department" class="form-select" required>
+            <option disabled selected>Select department</option>
+            {% for dept in departments %}
+            <option value="{{ dept.name }}">{{ dept.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Course</button>
+      </form>
+    </div>
+
+    <!-- Add Grade Form -->
+    <div class="col-md-6">
+      <h4>📝 Add Grade</h4>
+      <form method="POST">
+        <input type="hidden" name="add_grade" value="1">
+        <div class="mb-3">
+          <label for="student_id" class="form-label">Select Student</label>
+          <select id="student_id" name="student_id" class="form-select" required>
+            <option disabled selected>Select student</option>
+            {% for student in students %}
+            <option value="{{ student.id }}">{{ student.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="course_id" class="form-label">Select Course</label>
+          <select id="course_id" name="course_id" class="form-select" required>
+            <option disabled selected>Select course</option>
+            {% for course in courses %}
+            <option value="{{ course.id }}">{{ course.course_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="semester" class="form-label">Semester</label>
+          <select id="semester" name="semester" class="form-select" required>
+            <option disabled selected>Select semester</option>
+            <option value="1">1st Semester</option>
+            <option value="2">2nd Semester</option>
+            <option value="3">3rd Semester</option>
+          </select>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-6">
+            <label for="mid_exam" class="form-label">Mid Exam (30%)</label>
+            <input type="number" id="mid_exam" name="mid_exam" min="0" max="100" step="0.01" class="form-control" required>
+          </div>
+          <div class="col-6">
+            <label for="final_exam" class="form-label">Final Exam (40%)</label>
+            <input type="number" id="final_exam" name="final_exam" min="0" max="100" step="0.01" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-6">
+            <label for="assignment" class="form-label">Assignment (20%)</label>
+            <input type="number" id="assignment" name="assignment" min="0" max="100" step="0.01" class="form-control" required>
+          </div>
+          <div class="col-6">
+            <label for="quiz" class="form-label">Quiz (10%)</label>
+            <input type="number" id="quiz" name="quiz" min="0" max="100" step="0.01" class="form-control" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success">Add Grade</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
