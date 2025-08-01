@@ -11,13 +11,13 @@
     <div class="alert alert-danger text-center">{{ error }}</div>
   {% endif %}
 
-  <!-- 🔽 Filter by Department -->
+  <!-- Filter by Department -->
   <form method="GET" action="/add-grade" class="mb-4">
     <div class="row">
       <div class="col-md-6 offset-md-3">
         <label for="departmentFilter" class="form-label">🏫 Filter by Department:</label>
-        <select id="departmentFilter" class="form-select" name="department" onchange="this.form.submit()">
-          <option value="">-- All Departments --</option>
+        <select id="departmentFilter" name="department" class="form-select" onchange="this.form.submit()">
+          <option value="" {% if not selected_dept %}selected{% endif %}>-- All Departments --</option>
           {% for dept in departments %}
             <option value="{{ dept.name }}" {% if dept.name == selected_dept %}selected{% endif %}>
               {{ dept.name }}
@@ -28,12 +28,12 @@
     </div>
   </form>
 
-  <!-- 📥 Grade Entry Form -->
+  <!-- Grade Entry Form -->
   <form method="POST" novalidate>
     <div class="row mb-3">
       <div class="col-md-6">
         <label for="studentSelect" class="form-label">👩‍🎓 Select Student:</label>
-        <select id="studentSelect" class="form-select" name="student_id" required>
+        <select id="studentSelect" name="student_id" class="form-select" required>
           <option disabled selected>Select a student</option>
           {% for student in students %}
             <option value="{{ student.id }}">{{ student.name }}</option>
@@ -42,7 +42,7 @@
       </div>
       <div class="col-md-6">
         <label for="courseSelect" class="form-label">📚 Select Course:</label>
-        <select id="courseSelect" class="form-select" name="course_id" required>
+        <select id="courseSelect" name="course_id" class="form-select" required>
           <option disabled selected>Select a course</option>
           {% for course in courses %}
             <option value="{{ course.id }}">{{ course.course_name }}</option>
@@ -53,7 +53,7 @@
 
     <div class="mb-3">
       <label for="semesterSelect" class="form-label">🕓 Semester</label>
-      <select id="semesterSelect" class="form-select" name="semester" required>
+      <select id="semesterSelect" name="semester" class="form-select" required>
         <option disabled selected>Select semester</option>
         <option value="1">1st Semester</option>
         <option value="2">2nd Semester</option>
@@ -64,23 +64,23 @@
     <div class="row mb-3">
       <div class="col-md-3">
         <label for="mid" class="form-label">🧮 Mid Exam (30%)</label>
-        <input type="number" id="mid" class="form-control" name="mid_exam" min="0" max="100" step="0.01" required>
+        <input type="number" id="mid" name="mid_exam" class="form-control" min="0" max="100" step="0.01" required>
       </div>
       <div class="col-md-3">
         <label for="final" class="form-label">📚 Final Exam (40%)</label>
-        <input type="number" id="final" class="form-control" name="final_exam" min="0" max="100" step="0.01" required>
+        <input type="number" id="final" name="final_exam" class="form-control" min="0" max="100" step="0.01" required>
       </div>
       <div class="col-md-3">
         <label for="assignment" class="form-label">✍️ Assignment (20%)</label>
-        <input type="number" id="assignment" class="form-control" name="assignment" min="0" max="100" step="0.01" required>
+        <input type="number" id="assignment" name="assignment" class="form-control" min="0" max="100" step="0.01" required>
       </div>
       <div class="col-md-3">
         <label for="quiz" class="form-label">📝 Quiz (10%)</label>
-        <input type="number" id="quiz" class="form-control" name="quiz" min="0" max="100" step="0.01" required>
+        <input type="number" id="quiz" name="quiz" class="form-control" min="0" max="100" step="0.01" required>
       </div>
     </div>
 
-    <!-- 🧮 Live Weighted Calculation -->
+    <!-- Live Weighted Calculation -->
     <div class="text-center mb-4">
       <span class="badge bg-info">Total (weighted): <span id="total">-</span></span>
       <span class="badge bg-secondary ms-3">Letter Grade: <span id="letter">-</span></span>
@@ -88,12 +88,11 @@
 
     <div class="text-center">
       <button type="submit" class="btn btn-success">✅ Submit Grade</button>
-      <a href="/dashboard" class="btn btn-outline-secondary ms-3">⬅️ Back</a>
+      <a href="/teacher/dashboard" class="btn btn-outline-secondary ms-3">⬅️ Back</a>
     </div>
   </form>
 </div>
 
-<!-- 🧮 JS: Weighted Grade Calculation -->
 <script>
   const mid = document.getElementById("mid");
   const finalExam = document.getElementById("final");
@@ -106,7 +105,7 @@
     const a = parseFloat(assignment.value) || 0;
     const q = parseFloat(quiz.value) || 0;
 
-    const total = +(m + f + a + q).toFixed(2);
+      const total = m + f + a + q;
     document.getElementById("total").innerText = total;
 
     let letter = "-";
