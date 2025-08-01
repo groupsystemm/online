@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% block title %}Edit Grade{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white fw-bold">
+      ✏️ Edit Grade - {{ grade.student_name }} | {{ grade.course_name }}
+    </div>
+    <div class="card-body">
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">Mid Exam</label>
+          <input type="number" name="mid" step="0.01" value="{{ grade.mid_exam }}" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Final Exam</label>
+          <input type="number" name="final" step="0.01" value="{{ grade.final_exam }}" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Assignment</label>
+          <input type="number" name="assignment" step="0.01" value="{{ grade.assignment }}" class="form-control" required>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Quiz</label>
+          <input type="number" name="quiz" step="0.01" value="{{ grade.quiz }}" class="form-control" required>
+        </div>
+
+        <button type="submit" class="btn btn-success">✅ Update Grade</button>
+        <a href="/admin/view-all-grades" class="btn btn-secondary ms-2">← Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
